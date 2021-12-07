@@ -28,26 +28,38 @@ load(MIDA_mapping_fname);
 
 % Load MIDA model and masks
 info = niftiinfo(MIDA_map_fname);
-original_segmap = niftiread(MIDA_map_fname);
+HR_orig_segmap = niftiread(MIDA_map_fname);
 WMH_segmap = niftiread(MIDA_WMH_fname);
 RSL_segmap = niftiread(MIDA_RSL_fname);
 
 % Map tissues
-HR_tissue_map = zeros(size(original_segmap));
-for c=1:size(mapping,1)
-    HR_tissue_map(original_segmap == c) = mapping(c, 2);
+HR_tissue_map_clean = zeros(size(HR_orig_segmap));
+for c=1:size(mapping, 1)
+    HR_tissue_map_clean(HR_orig_segmap == c) = mapping(c, 2);
 end
 
 % Add pathological tissues to the segmentation mask
-HR_tissue_map(WMH_segmap == 1 & HR_tissue_map ~= 2) = 4;
-HR_tissue_map(RSL_segmap == 1) = 5;
+HR_tissue_map_ageing = HR_tissue_map_clean;
+HR_tissue_map_ageing(WMH_segmap == 1 & HR_tissue_map_ageing ~= 2) = 4;
+HR_tissue_map_ageing(RSL_segmap == 1) = 5;
 
-HR_tissue_map = padarray(HR_tissue_map(:, 141:end, :), [0, 70, 65], 1, 'both');
-HR_tissue_map = permute(HR_tissue_map, [3, 1, 2]);
-HR_tissue_map = flip(HR_tissue_map, 2);
+HR_tissue_map_clean = padarray(HR_tissue_map_clean(:, 141:end, :), [0, 70, 65], 1, 'both');
+HR_tissue_map_clean = permute(HR_tissue_map_clean, [3, 1, 2]);
+HR_tissue_map_clean = flip(HR_tissue_map_clean, 2);
 
-% Save HR tissue map
+HR_tissue_map_ageing = padarray(HR_tissue_map_ageing(:, 141:end, :), [0, 70, 65], 1, 'both');
+HR_tissue_map_ageing = permute(HR_tissue_map_ageing, [3, 1, 2]);
+HR_tissue_map_ageing = flip(HR_tissue_map_ageing, 2);
+
+% Save HR tissue maps
 info.ImageSize = NTrue;
 info.PixelDimensions = HRes_mm;
 info.Transform = affine3d(eye(4));
-niftiwrite(uint16(HR_tissue_map), ['input', filesep, 'HR_tissue_map'], info);
+niftiwrite(uint16(HR_tissue_map_clean), MIDA_tissue_map_fname, info, 'Compressed', 1);
+niftiwrite(uint16(HR_tissue_map_ageing), MIDA_tissue_map_ageing_fname, info, 'Compressed', 1);
+
+HR_SI = SI(HR_tissue_map_clean);
+
+% save HR T2-like image
+niftiwrite(uint16(HR_SI), MIDA_T2_fname, info, 'Compressed', 1);
+niftiwrite(uint16(HR_SI>0), MIDA_brain_mask_fname, info, 'Compressed', 1);
