@@ -49,4 +49,8 @@ if strcmp(getenv('LD_LIBRARY_PATH'),'/usr/local/lib:/usr/local/lib64:/usr/lib64'
     setenv('LD_LIBRARY_PATH', '/usr/local/lib:/usr/local/lib64:/usr/lib64');
 end
 
+if strcmp(getenv('ANTSPATH'),'/local2/ANTsX-ANTs-1904a52/antsbin/bin')==0
+    setenv('ANTSPATH', '/local2/ANTsX-ANTs-1904a52/antsbin/bin');
+end
+
 RORPO_command = '/local2/RORPO/bin/RORPO_multiscale_usage --input=%s --output=%s --scaleMin=3 --factor=1.5 --nbScales=4 --normalize --uint8 --mask=%s --core=33';

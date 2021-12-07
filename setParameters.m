@@ -17,6 +17,7 @@ NAcq = floor(FOV_mm_Acq./MSSIII_res_mm);%number of points acquired
 apply_gross_motion = 1; %flag indicating whether to apply gross motion
 apply_motion_artefacts = 1; %flag indicating whether to induce motion artefacts.
 apply_noise = 1; %flag indicating whether to add noise or not
+low_contrast = 1; %flag indicating whether to simulate PVS of lower contrast than that in real data
 
 % Noise extent
 % We represent the signal-to-noise ratio (SNR) as the quotient
@@ -41,7 +42,12 @@ NumRegions = 9;
 NAWM_class_idx = 3;
 WMH_class_idx = 4;
 dGM_class_idx = 7;
-SI = [0 425 75 130 180 85 85 0 200];
+
+if ~low_contrast
+    SI = [0 425 75 130 180 85 85 0 200];
+else
+    SI = [0 425 75 130 180 85 85 0 150];
+end
 
 %% PVS generation parameters
 NRep = 1; % number of repetitions
