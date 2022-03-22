@@ -4,14 +4,14 @@
 %  
 %  Inputs:
 %  - SI: 3D sMRI signal
-%  - trans_matrix: Transformation matrix
-%  - Dim: Dimension
+%  - theta: rotation angle
+%  - dimensions: 3x1 boolean vector
 %
 %  Outputs:
 %   - SI: 3D sMRI signal
 %
-% (c) Jose Bernal 2021
+% (c) Jose Bernal 2022
 
-function SI = applyGrossMotion(SI, trans_matrix, Dim)
-    SI = imwarp(SI, trans_matrix, 'cubic', 'OutputView', imref3d(Dim));
+function SI = applyRotation(SI, theta, dimensions)
+    SI = imrotate3(SI, theta, dimensions, 'crop');
 end

@@ -20,7 +20,7 @@
 %  Outputs:
 %   - k_space_noisy: Noisy k-space
 %
-% (c) Jose Bernal 2021
+% (c) Jose Bernal and Michael J. Thrippleton 2020
 
 function k_space_noisy=add_noise(k_space, SDnoise, NAcq)
     N_voxels = prod(NAcq);

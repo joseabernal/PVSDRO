@@ -13,22 +13,23 @@ setConfig;
 % set parameters
 setParameters;
 
-parfor iCase = 1:length(lengths)
-    for rep=1:NRep
+for iCase = 1:length(lengths)
+    parfor rep=1:NRep
         % define input and output filenames
         input_fname = sprintf(HR_PVS_map_output_pattern, num2str(iCase), num2str(rep));
-        output_fname = sprintf(LR_PVS_map_output_pattern, num2str(iCase), num2str(rep));
+        output_fname = sprintf(LR_PVS_map_output_pattern, num2str(iCase), num2str(rep), num2str(LBC_res_mm(1)), num2str(LBC_res_mm(2)), num2str(LBC_res_mm(3)));
 
         info = niftiinfo(input_fname);
-        info.Datatype = 'double';
+        info.Datatype = 'uint8';
         info.ImageSize = NAcq;
-        info.PixelDimensions = MSSIII_res_mm;
-        
-        HR_Map = double(niftiread(input_fname)>0);
-        
-        LR_Map = resample(HR_Map, FOV_mm_True, NTrue, FOV_mm_Acq, NAcq);
+        info.PixelDimensions = LBC_res_mm;
+
+        HR_Map = bwdist(niftiread(input_fname)==0);
+
+        LR_Map = generateLRData(...
+            HR_Map, FOV_mm_True, NTrue, SDnoise, FOV_mm_Acq, NAcq, 0, 0);
 
         % save LR PVS map
-        niftiwrite(double(LR_Map), output_fname, info, 'Compressed', 1);
+        niftiwrite(uint8(LR_Map>0.5), output_fname, info, 'Compressed', 1);
     end
 end

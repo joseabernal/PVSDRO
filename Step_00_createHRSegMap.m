@@ -23,7 +23,8 @@ setConfig;
 setParameters;
 
 %% Generate high-resolution map
-% Load variable containing the mapping between the original 116 labels to 8
+% Load variable containing the mapping between the original 116 labels to
+% less labels
 load(MIDA_mapping_fname);
 
 % Load MIDA model and masks
@@ -41,7 +42,6 @@ end
 % Add pathological tissues to the segmentation mask
 HR_tissue_map_ageing = HR_tissue_map_clean;
 HR_tissue_map_ageing(WMH_segmap == 1 & HR_tissue_map_ageing ~= 2) = 4;
-HR_tissue_map_ageing(RSL_segmap == 1) = 5;
 
 HR_tissue_map_clean = padarray(HR_tissue_map_clean(:, 141:end, :), [0, 70, 65], 1, 'both');
 HR_tissue_map_clean = permute(HR_tissue_map_clean, [3, 1, 2]);

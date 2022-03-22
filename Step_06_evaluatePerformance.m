@@ -16,102 +16,73 @@ setConfig;
 setParameters;
 
 % load brain and ROI masks
-tissue_map = niftiread(LR_brain_mask_fname);
-tissue_map = bwdist(~tissue_map)>2;
-
-ROI = niftiread(LR_ROI_mask_fname);
-ROI = ROI > 0.95;
-
-sensitivity_values = nan(9, 103);
-specificity_values = nan(9, 103);
-precision_values = nan(9, 103);
-for iCase = 1:length(lengths)
-    GT_list = zeros([numel(ROI), NRep]);
-    likelihood_list = zeros([numel(ROI), NRep]);
-    for rep=1:NRep
-        % load signal and ground truth
-        SI_fname = sprintf(LR_SI_output_pattern, num2str(iCase), num2str(rep));
-        GT_fname = sprintf(LR_PVS_map_output_pattern, num2str(iCase), num2str(rep));
-        
-        info = niftiinfo(SI_fname);
-        SI = double(niftiread(SI_fname));
-        GT = niftiread(GT_fname);
-        GT = GT >= 0.5;
-        GT = GT .* tissue_map;
-        
-        % run filters
-        if filter_idx == FRANFI_FILTER
-            PVS_likelihood = FrangiFilter3D(SI, MSSIII_res_mm, options);
-        end
-        
-        if filter_idx == JERMAN_FILTER
-            PVS_likelihood = vesselness3D(SI, scales, MSSIII_res_mm, tau, isbrightondark);
-        end
-        
-        if filter_idx == RORPO_FILTER
-            PVS_likelihood = RORPO_wrapper(SI, ROI.*tissue_map, SI_fname, RORPO_command);
-        end
-        
-        % mask segmentations outside of the region of interest
-        PVS_likelihood = PVS_likelihood .* ROI;
-        PVS_likelihood = PVS_likelihood .* tissue_map;
-        
-        GT_list(:, rep) = GT(:);
-        likelihood_list(:, rep) = PVS_likelihood(:);
-    end
-    
-    GT_list = GT_list(ROI, :);
-    likelihood_list = likelihood_list(ROI, :);
-    
-    threshold_list = [-Inf, 10.^(prctile(log10(likelihood_list(likelihood_list>0)), 0:100)), 1];
-    
-    % compute sensitivity, specificity, precision for multiple thresholds
-    parfor iThreshold=1:length(threshold_list)
-        display(iThreshold)
-        seg = likelihood_list > threshold_list(iThreshold);
-        
-        tp = sum(GT_list & seg, 1);
-        fn = sum(GT_list & ~seg, 1);
-        fp = sum(~GT_list & seg, 1);
-        tn = sum(~(GT_list | seg), 1);
-        
-        sensitivity = tp ./ (tp+fn);
-        specificity = tn ./ (tn+fp);
-        precision = tp ./ (tp+fp);
-        
-        sensitivity_values(iCase, iThreshold) = mean(sensitivity);
-        specificity_values(iCase, iThreshold) = mean(specificity);
-        precision_values(iCase, iThreshold) = mean(precision);
-    end
-end
-
-%% Plot receiver-operating and precision-recall curves
-colours = distinguishable_colors(length(lengths));
-
-figure;
-hold on;
-xlabel('1-Specificity')
-ylabel('Sensitivity')
-plot([0, 1], [0, 1], 'Color', [17 17 17]/255)
-for iOpt=1:length(lengths)
-    plot(1-specificity_values(iOpt, :), sensitivity_values(iOpt, :), 'Color', colours(iOpt, :))
-end
-hold off;
+LR_ROI_mask_output_fname = sprintf(LR_ROI_mask_fname, num2str(LBC_res_mm(1)), num2str(LBC_res_mm(2)), num2str(LBC_res_mm(3)));
+ROI = niftiread(LR_ROI_mask_output_fname) == 1;
+% ROI = bwdist(~ROI)>=2;
 
 figure;
 hold on;
 xlabel('Recall')
 ylabel('Precision')
-for iOpt=1:length(lengths)
-    tmp = precision_values(iOpt, :);
-    tmp(isnan(tmp)) = 1;
-    plot(sensitivity_values(iOpt, :), tmp, 'Color', colours(iOpt, :))
-    display([iOpt, lengths(iOpt), widths(iOpt), trapz(tmp, sensitivity_values(iOpt, :))])
-end
-hold off;
+xlim([0, 1])
+ylim([0, 1])
 
-tmp = precision_values;
-tmp(isnan(tmp)) = 1;
-summary.sensitivity = sensitivity_values;
-summary.precision = tmp;
-summary.specificity = specificity_values;
+rep=1;
+for filter_idx = [FRANGI_FILTER, JERMAN_FILTER, RORPO_FILTER]
+    sensitivity_values = cell(length(lengths), NRep);
+    precision_values = cell(length(lengths), NRep);
+    auc_values = nan(length(lengths), NRep);
+    for iCase = 1:length(lengths)
+        parfor rep=1:NRep
+            % load signal and ground truth
+            SI_fname = sprintf(LR_SI_output_pattern, num2str(iCase), num2str(rep), num2str(LBC_res_mm(1)), num2str(LBC_res_mm(2)), num2str(LBC_res_mm(3)));
+            GT_fname = sprintf(LR_PVS_map_output_pattern, num2str(iCase), num2str(rep), num2str(LBC_res_mm(1)), num2str(LBC_res_mm(2)), num2str(LBC_res_mm(3)));
+            LR_likelihood_fname = sprintf(LR_likelihood_pattern, filter_names{filter_idx}, num2str(iCase), num2str(rep), num2str(LBC_res_mm(1)), num2str(LBC_res_mm(2)), num2str(LBC_res_mm(3)));
+
+            GT = niftiread(GT_fname);
+
+            if sum(GT(ROI) == 1) == 0
+                continue
+            end
+
+            if ~exist([LR_likelihood_fname, '.nii.gz'], 'file')
+                info = niftiinfo(SI_fname);
+                SI = double(niftiread(SI_fname));    
+
+                % run filters
+                switch filter_idx
+                    case FRANGI_FILTER
+                        PVS_likelihood = FrangiFilter3D(SI, LBC_res_mm, options);
+                    case JERMAN_FILTER
+                        PVS_likelihood = vesselness3D(SI, scales, LBC_res_mm, tau, isbrightondark);
+                    case RORPO_FILTER
+                        PVS_likelihood = RORPO_wrapper(SI, ROI, SI_fname, RORPO_command);
+                end
+
+                % mask segmentations outside of the region of interest
+                PVS_likelihood = double(PVS_likelihood);
+                PVS_likelihood = PVS_likelihood .* double(ROI);
+
+                info.Datatype = 'double';
+                niftiwrite(PVS_likelihood, LR_likelihood_fname, info, 'Compressed', 1);
+            else
+                PVS_likelihood = niftiread(LR_likelihood_fname);
+            end
+            
+            [X, Y, T] = perfcurve(GT(ROI), PVS_likelihood(ROI), 1, 'XCrit', 'reca', 'YCrit', 'prec');
+            Y(isnan(Y)) = 1;
+
+            sensitivity_values{iCase, rep} = X;
+            precision_values{iCase, rep} = Y;
+            auc_values(iCase, rep) = trapz(X, Y);
+
+            plot(sensitivity_values{iCase, rep}, precision_values{iCase, rep})
+            display([iCase, lengths(iCase), widths(iCase), auc_values(iCase, rep)])
+            drawnow;
+        end
+    end
+    hold off;
+
+    save(sprintf(performance_fname, filter_names{filter_idx}, num2str(LBC_res_mm(1)), num2str(LBC_res_mm(2)), num2str(LBC_res_mm(3))), ...
+        'sensitivity_values', 'precision_values', 'auc_values');
+end
